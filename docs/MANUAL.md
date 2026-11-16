@@ -2,7 +2,7 @@
 
 **Connect your gear. Choose where the sound goes. Check that it is working.**
 
-Edition: 3 November 2026 · Raspberry Pi 4, pHAT DAC, OLED and rotary encoder.
+Edition: 17 November 2026 · Raspberry Pi 5 (a Pi 4 also works), pHAT DAC, OLED and rotary encoder.
 
 [Read the illustrated HTML edition](manual/index.html). The Markdown edition below can be read directly on GitHub. The HTML embeds its images: download that one file to read it offline, or serve it with GitHub Pages.
 
@@ -47,7 +47,7 @@ There are three audio modes. Choose one in **Outputs → Audio mode**; changing 
 
 **Host** means the computer or sampler using the Pi as its USB audio interface. A **source** produces a signal; a **destination** receives it. A **route** connects the two. Audio and MIDI routes are separate.
 
-In Hub mode the pHAT provides a continuous 48 kHz engine. USB and network adapters join that engine independently. Disconnecting the USB host leaves local listening running. There are two stereo network output choices: standard RTP/PCM with an SDP description, and Ableton Link Audio. Both start disabled.
+In Hub mode the pHAT provides a continuous 48 kHz engine. USB and network adapters join that engine independently. Disconnecting the USB host leaves local listening running. The 26-channel link between the USB host and that engine goes through a bridge that follows the host's sample rate; see [the USB host bridge](#the-usb-host-bridge-and-latency). There are two stereo network output choices: standard RTP/PCM with an SDP description, and Ableton Link Audio. Both start disabled.
 
 Network audio is **send-only** in this implementation. Full AES67, Dante, network input and SonoBus/AOO adapters are not implemented. See [implementation details](OUTPUTS.md) and [project research](NETWORK_RESEARCH.md).
 
@@ -386,6 +386,8 @@ Check one thing at a time. Changing the cable, preset and host settings together
 | `no rpi-audiod status` | The audio service is not publishing a recent status; run the checks below |
 | Clock one hour wrong | Time zone and clock synchronization |
 | Echo or growing feedback | Check whether a return feeds itself; use one monitoring point |
+| Clicks, or `resyncs` or `xruns` rising in `rpi-audiod status` | Check the temperature first (see [Cooling](#cooling-the-pi-5)); then raise `host_margin_ms` if only the USB host bridge resyncs |
+| Temperature near 80 °C | Fit or check the fan; the Pi 5 cuts its clock at 80 °C and audio can break up |
 
 USB bandwidth and WiFi capacity are different limits. If a problem remains, note the mode, devices, USB state, selected route and exact message. Connection and mapping screens are useful evidence.
 
@@ -506,6 +508,47 @@ The service applies these saved commands automatically. An engine change interru
 
 Transport settings are in `[network]` in `/etc/rpi-audio/rpi-audio.toml` or a drop-in. Defaults are `address = "239.69.1.1"`, `port = 5004`, `ttl = 1`, `http_port = 8080`. Restart `rpi-audiod` after editing configuration. The SDP endpoint is a local-network read-only download, with no authentication or configuration controls. Keep it on your trusted network.
 
+### The USB host bridge and latency
+
+In Hub mode the 26-channel gadget is joined to the engine by a bridge that resamples from the host's rate (44.1 kHz by default) to the engine's 48 kHz and follows the host's clock. There are two:
+
+- **`native` (the default since 14 November 2026)** is `rpi-audio-hostbridge`. It works inside JACK's callback on the gadget's own buffer and resamples all 26 channels in one pass.
+- **`zita`** starts zita-ajbridge programs, as the other USB devices do. It is used when you ask for it, and also when the native program is not built.
+
+Both settings are in `[usb]` in `/etc/rpi-audio/rpi-audio.toml` (or a drop-in in `/etc/rpi-audio/rpi-audio.d/`, which an update does not overwrite). Restart `rpi-audiod` after editing.
+
+```toml
+[usb]
+host_bridge = "native"   # or "zita"
+host_margin_ms = 1.5     # audio kept buffered per direction, 0.25-20 ms
+host_quality = 32        # resampler half-length in frames, 8-96
+```
+
+`host_margin_ms` is the trade-off. A lower margin means less delay, but the bridge then has less room when the system is late, and it **resyncs** (jumps back to its margin, with a small glitch). `sudo rpi-audiod status` shows the buffer's smallest, average and largest fill and the resync count; lower the margin only while the smallest value stays well above zero.
+
+Measured on a Raspberry Pi 5 with a Linux laptop as the host (the Pi's share of the round trip; absolute values are good to about ±2 ms):
+
+| Bridge | Pi share, median |
+|---|---|
+| Native, 0.5 / 1.0 / **1.5 (default)** ms margin | 5.1 / 7.8 / **8.6** ms |
+| zita | 14.8 ms |
+| For comparison, host-clock mode (no resampling) | 5.5 ms |
+
+The native bridge is 5–6 ms faster than zita and uses about a quarter of the CPU (5.7–5.9 % of one core for 26 channels each way, against 22.4 %). 1.5 ms stays the default because the laptop saw resyncs at lower values; with an Akai Force the 0.75 ms margin ran 10.5 minutes without one, but that is a single run. Latency with the Force as the host has not been measured. Details: `docs/hw/2026-11-11-native-bridge.md` and `docs/hw/2026-11-13-perf-fan.md` (in Spanish).
+
+### Cooling the Pi 5
+
+**Fit a fan.** A Pi 5 with no cooling ran at 72–76 °C with the bridges running and 79–81 °C with a host streaming. At 80 °C the firmware lowers the clock, which can break the audio up. With a fan on the Pi 5's fan header (the Pi's own driver sets its speed from the temperature) the same load stayed at **49–53 °C** for a 62-minute run with a host, a mixer and a multichannel interface, with no xruns and no resyncs. With all four cores busy as well it peaked at 67.5 °C and still had none. The Pi 4 has no fan header; a heatsink or case fan helps there too.
+
+Check it any time:
+
+```sh
+cat /sys/class/thermal/thermal_zone0/temp     # in thousandths of a degree
+vcgencmd get_throttled                        # 0x0 means no throttling or under-voltage so far
+```
+
+The Status screen on the OLED also shows the temperature. One known blip: after some restarts of `rpi-audiod`, the bridge resyncs once or twice, or JACK reports an xrun, about ten seconds after start-up. The cause is not known; it only happens at start-up.
+
 ### Clock and WiFi
 
 ```sh
@@ -555,7 +598,7 @@ sudo reboot
 
 **To leave appliance mode:** run `sudo raspi-config nonint disable_overlayfs` and reboot, then run `sudo raspi-config nonint disable_bootro`. Next, run `sudo systemctl disable rpi-audio-persist-restore.service rpi-audio-persist.path`. Finally, run `sudo ./install.sh` without `--read-only`, which puts the journal back on disk. The installer prints these steps too. `/boot/firmware/rpi-audio/` can stay, since nothing reads it then; `sudo ./install.sh --uninstall --purge` removes it.
 
-Not yet tested on hardware: whether the boot partition's file system needs a check after a power cut during a save, how much RAM the overlay uses during a long session, and how much the frequent saves wear the card.
+On the reference Pi 5 this is installed and boots with every service running (17 November 2026; the root is an `overlay`, `/boot/firmware` is `ro`, and the overlay used about 9 MB). Not yet tested on hardware: a saved setting surviving a reboot, a series of real power cuts, whether the boot partition's file system needs a check after a cut during a save, how much RAM the overlay uses during a long session, and how much the frequent saves wear the card. Until the cuts have been tried, shut the Pi down from the Power menu (or `sudo systemctl poweroff`) when you can.
 
 ### Watchdogs
 
@@ -592,6 +635,9 @@ The OLED is an SH1106, 128×64, at I2C address `0x3C`. The pHAT uses I2S on GPIO
 | USB gadget | The USB interface the Pi presents to the host |
 | MIDI | Notes and commands, not recorded sound |
 | Latency | How long sound takes to reach its destination |
+| Resync | The USB host bridge ran out of buffered audio and jumped back to its margin; it can cause a small glitch |
+| Xrun | JACK did not finish a processing cycle in time |
+| Throttling | The Pi lowering its clock because it is too hot (or its supply too weak) |
 | Buffer | A small audio reserve; more margin can avoid dropouts and add delay |
 | Sample rate | How many audio samples are represented per second |
 | Preset | A stored routing and level configuration |
@@ -612,7 +658,7 @@ References to external software do not mean its adapter is installed in rpi-audi
 
 ## 16. Build your own device
 
-This chapter describes the **Pi 4 + pHAT DAC + SH1106 + encoder** reference assembly. You can build the USB audio hub without the DAC or controls, then add local listening and the front panel. The complete reference build provides all three audio modes described in this guide.
+This chapter describes the **Pi 5 + pHAT DAC + SH1106 + encoder** reference assembly. A Pi 4 uses the same header and software; its differences are noted where they matter. You can build the USB audio hub without the DAC or controls, then add local listening and the front panel. The complete reference build provides all three audio modes described in this guide.
 
 ![Parts grouped by their job](manual/img/21-build-parts.png)
 
@@ -624,9 +670,9 @@ On a phone, swipe the tables sideways to read all columns.
 
 | Qty | Component | Needed for | What to check |
 |---|---|---|---|
-| 1 | Raspberry Pi 4 Model B | Every build | Reference platform; other Pi models are not validated by this guide |
+| 1 | Raspberry Pi 5 | Every build | Reference platform since 7 November 2026. A Pi 4 Model B was the original one and also works; other Pi models are not validated by this guide |
 | 1 | microSD card and a reader for your setup computer | Operating system | A 32 GB card is a practical build choice, not a measured minimum requirement; flashing erases the selected card |
-| 1 | Pi 4 USB-C power supply | Every build | The official 15 W supply is specified at 5.1 V / 3 A; allow separately for power-hungry peripherals |
+| 1 | Pi 5 USB-C power supply | Every build | The official 27 W supply (5.1 V / 5 A) lets the USB-A ports share their full current; a 3 A supply makes the firmware limit them to 600 mA in total. A Pi 4 uses the 15 W / 3 A one. Allow separately for power-hungry peripherals |
 | 1 | USB-C power/data splitter | USB host operation with a separate supply | The reference uses the 8086 USB-C/PWR Splitter; a headphone/charging adapter is not an equivalent |
 | 2 | USB data cables for the splitter | USB host operation | One splitter-to-Pi cable and one splitter-to-host cable; connector ends must match your splitter/host; charge-only cables do not work |
 | 1 | Pimoroni pHAT DAC | Local listening and the reference Hub clock | PCM5102A I2S stereo line output; the tested overlay is `hifiberry-dac` |
@@ -638,7 +684,8 @@ On a phone, swipe the tables sideways to read all columns.
 | 1 | Stereo line cable | Local listening | Match the DAC output and your mixer/amplifier inputs |
 | As needed | USB audio/MIDI devices and their USB data cables | Audio/MIDI sources and destinations | Linux-compatible devices; these are external equipment, not parts of the Pi board |
 | Optional | Ethernet cable | Setup and network audio | Wired networking makes initial setup and network-audio diagnosis easier |
-| Optional | Enclosure and cooling | A permanent installation | Leave room for the DAC, wiring and connectors, ventilation and strain relief; no case CAD or verified drilling template is supplied |
+| 1 | Fan for the Pi 5 (its Active Cooler, or any fan on the fan header) | Strongly recommended on a Pi 5 | Without one the Pi 5 reaches 80 °C and cuts its clock when a host streams; see [Cooling](#cooling-the-pi-5). The tested one runs at about 3,000 rpm under load |
+| Optional | Enclosure | A permanent installation | Leave room for the DAC, wiring and connectors, airflow for the fan and strain relief; no case CAD or verified drilling template is supplied |
 | Optional | Separately powered USB hub | Peripherals that need extra power/ports | On the Pi's USB-A side; does not increase the full-speed audio bandwidth budget; test it with your devices |
 
 The existing reference panel combines the OLED, encoder and two extra buttons on one **nine-pin board**. Its vendor/model has not been identified in the project notes. If you already have that board, do not buy the separate controls again. If buying new parts, the separate components above describe the required electrical interface; their particular combination has not been physically validated here.
