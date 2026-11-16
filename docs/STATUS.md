@@ -1,4 +1,11 @@
-# Estado: 2026-11-14
+# Estado: 2026-11-16
+
+## Actualización del 16 de noviembre: el puente nativo con la Force, y rutas nuevas
+
+- [Pi, Force] **Visto el puente nativo por defecto con la Force:** 26/26 a 44,1 kHz, «native bridge running» en los dos sentidos, buffer 59–72 sobre 66, ±50–100 ppm. MPC 3.9.1.2 abrió rpi-audio a las 14:48 (26 in/26 out, buffer 128) y sigue sin errores de audio en su log ~3 h después. En la Pi: 8 xruns y 2+1 resyncs a las 14:53:58 (5 min tras arrancar) y 1 resync por sentido a las 17:35:31, de causa desconocida.
+- [Pi] **Hallazgo:** `gp150_out` (zita-j2a, `-p 64 -n 2`) entraba en «excessive timing errors, waiting 10 seconds» cada ~10 s desde el 15/11 a las 16:33: más de 2200 avisos, la salida a la GP-150 se cortaba. Sin causa confirmada; la sospecha es el periodo 64×2. Ya no se usa: el usuario no quiere salida a la GP-150. La entrada (`gp150_in`) iba bien.
+- [Pi] La GP-150 está en modo legacy (2 in / 2 out, sin MIDI visible). El mezclador (08bb:2902, sin serie) pasó al puerto 3-2 y se quedó sin rutas.
+- [Pi] **Rutas nuevas, a petición del usuario** (`rpi-audiod route/unroute`): a la Force, mezclador → IN 1–2, GP-150 → IN 3–4, Tracker → IN 15–22; desde la Force, OUT 1–2 (master) → pHAT DAC y OUT 11–12 → Tracker. Fuera: las salidas a la GP-150 y al mezclador, los pares 2–3 de la GP-150 y el Tracker → pHAT directo. Comprobado en `status.json` y en el log de conexiones; **no se ha escuchado** ni medido con tonos.
 
 ## Actualización del 14 de noviembre: el puente nativo, por defecto
 
