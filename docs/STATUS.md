@@ -6,6 +6,7 @@
 - [Pi] **Hallazgo:** `gp150_out` (zita-j2a, `-p 64 -n 2`) entraba en «excessive timing errors, waiting 10 seconds» cada ~10 s desde el 15/11 a las 16:33: más de 2200 avisos, la salida a la GP-150 se cortaba. Sin causa confirmada; la sospecha es el periodo 64×2. Ya no se usa: el usuario no quiere salida a la GP-150. La entrada (`gp150_in`) iba bien.
 - [Pi] La GP-150 está en modo legacy (2 in / 2 out, sin MIDI visible). El mezclador (08bb:2902, sin serie) pasó al puerto 3-2 y se quedó sin rutas.
 - [Pi] **Rutas nuevas, a petición del usuario** (`rpi-audiod route/unroute`): a la Force, mezclador → IN 1–2, GP-150 → IN 3–4, Tracker → IN 15–22; desde la Force, OUT 1–2 (master) → pHAT DAC y OUT 11–12 → Tracker. Fuera: las salidas a la GP-150 y al mezclador, los pares 2–3 de la GP-150 y el Tracker → pHAT directo. Comprobado en `status.json` y en el log de conexiones; **no se ha escuchado** ni medido con tonos.
+- [Pi, Force] **Después, a petición del usuario:** el Tracker pasa a IN 7–14 (pares 4–7) y las entradas propias de la Force a IN 5–6. En la Pi, IN 5–6 queda sin ruta. En la Force, `mpc_internal_io.conf` de la SD de MockbaMod pasa de `capture = 25:1, 26:2` a `5:1, 6:2` (copia `.bak-20261116` al lado). El add-on lee el fichero al cargar MPC: **no se aplica hasta reiniciar MPC**, cosa que hace el usuario. El valor por defecto del repo sigue en 25/26.
 
 ## Actualización del 14 de noviembre: el puente nativo, por defecto
 
