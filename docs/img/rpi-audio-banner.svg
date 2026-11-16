@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="780" viewBox="0 0 1600 780" role="img" aria-labelledby="title description">
   <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
   <title id="title">rpi-audio — Your gear. One audio hub.</title>
-  <desc id="description">A Raspberry Pi 4 with an OLED and rotary encoder routes USB audio and MIDI equipment to a pHAT DAC, a 26 by 26 USB host interface, and stereo RTP or Link Audio network sends.</desc>
+  <desc id="description">A Raspberry Pi 5 with an OLED and rotary encoder routes USB audio and MIDI equipment to a pHAT DAC, a 26 by 26 USB host interface, and stereo RTP or Link Audio network sends.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#14273b"/><stop offset="1" stop-color="#080f1d"/>

@@ -65,7 +65,7 @@ def overview():
         card(draw, (60, y, 393, y + 98), name, detail, title_size=23, detail_size=19)
         draw.line([(394, y + 49), (477, y + 49), (477, 394)], fill=TEAL, width=4)
     arrow(draw, [(477, 394), (552, 394)])
-    card(draw, (567, 310, 875, 478), "Raspberry Pi 4", "rpi-audio\nAudio + MIDI routing")
+    card(draw, (567, 310, 875, 478), "Raspberry Pi 5", "rpi-audio\nAudio + MIDI routing")
     card(draw, (1100, 310, 1393, 478), "USB host", "Computer or sampler\nOne audio interface")
     arrow(draw, [(893, 394), (1082, 394)], both=True)
     label(draw, (989, 345), "USB-C", size=22)
@@ -79,7 +79,7 @@ def architecture():
     image, draw = canvas("Inside the Pi: USB host clock mode",
                          "Audio uses JACK and resampling bridges; MIDI travels separately.", width=1600, height=875)
     draw.rounded_rectangle((48, 310, 1200, 750), 20, fill="#e9f2f7", outline="#91aebf", width=2)
-    draw.text((600, 332), "Raspberry Pi 4", font=font(25, True), fill=MUTED)
+    draw.text((600, 332), "Raspberry Pi 5", font=font(25, True), fill=MUTED)
     card(draw, (130, 142, 450, 252), "USB host", "Computer or sampler", color=BLUE)
     card(draw, (130, 390, 450, 540), "USB gadget", "UAC2 audio + USB MIDI\n26 × 26 audio channels")
     arrow(draw, [(290, 270), (290, 373)], both=True, color=BLUE)

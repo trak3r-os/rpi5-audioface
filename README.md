@@ -1,6 +1,6 @@
 # rpi-audio
 
-[![rpi-audio: a Raspberry Pi 4 routes USB audio and MIDI gear to a pHAT DAC, a 26×26 USB host interface, and stereo RTP or Link Audio network sends](docs/img/rpi-audio-banner.svg)](docs/MANUAL.md)
+[![rpi-audio: a Raspberry Pi 5 routes USB audio and MIDI gear to a pHAT DAC, a 26×26 USB host interface, and stereo RTP or Link Audio network sends](docs/img/rpi-audio-banner.svg)](docs/MANUAL.md)
 
 [![Release CI](https://img.shields.io/github/actions/workflow/status/trak3r-os/rpi5-audioface/ci.yml?event=release&style=flat-square&logo=github&label=release%20CI)](https://github.com/trak3r-os/rpi5-audioface/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-60cbb3?style=flat-square)](LICENSE)
@@ -19,7 +19,7 @@
 
 CI runs only when a GitHub release is published. Pushes, pull requests and draft-release edits do not start it. The Release CI badge tracks release runs.
 
-**A Raspberry Pi 4 that works as a USB audio hub.** Plug your USB sound cards, guitar processors, mixers and MIDI gear into the Pi, and plug the Pi into a computer or a standalone sampler. The host sees one class-compliant USB audio interface, **26 in × 26 out at 44.1 kHz, 16-bit by default**, plus **4 USB MIDI ports**. Each device gets its own channels.
+**A Raspberry Pi 5 (or 4) that works as a USB audio hub.** Plug your USB sound cards, guitar processors, mixers and MIDI gear into the Pi, and plug the Pi into a computer or a standalone sampler. The host sees one class-compliant USB audio interface, **26 in × 26 out at 44.1 kHz, 16-bit by default**, plus **4 USB MIDI ports**. Each device gets its own channels.
 
 **New to the box?** Start with the [illustrated English user guide](docs/MANUAL.md), readable directly on GitHub. An [HTML edition](docs/manual/index.html) with the same illustrated steps is included for a browser or GitHub Pages; GitHub's file viewer displays HTML source. The guide covers USB recording, standalone pHAT listening, controls, meters, simultaneous outputs, network audio and scenes.
 
@@ -31,7 +31,7 @@ Host profiles can save reservations only, an independent full setup including na
 
 Profiles now report Ready/Partial/Error with missing-resource details. Outputs offers independent software levels for pHAT, USB-host send, RTP and Link Audio. Status includes session-wide counters and a bounded event history collected while the OLED sleeps, retained across service restarts during the same boot.
 
-![USB audio and MIDI devices connect to a Pi 4, which presents one 26×26 audio interface and four MIDI cables to the host](docs/img/readme-overview.png)
+![USB audio and MIDI devices connect to a Pi, which presents one 26×26 audio interface and four MIDI cables to the host](docs/img/readme-overview.png)
 
 It was built for the Akai Force, which can use only one USB audio interface at a time. Nothing in it is tied to the Force: any host that supports USB Audio Class 2 should work. It has been tested with a Linux laptop and an Akai Force. Anything specific to one host lives in `docs/hosts/` and `tools/hosts/`.
 
@@ -55,8 +55,9 @@ The diagram and clock description below show the original **USB host clock** mod
 
 ![In host-clock mode, the USB gadget feeds JACK and separate resampling bridges for each audio device; MIDI control reaches rpi-audiod separately](docs/img/readme-architecture.png)
 
-1. **The USB gadget.** The Pi 4's USB-C port can act as a USB *device*. `gadget/` sets up a standard USB Audio Class 2 function and a USB MIDI function through configfs, so the host uses its built-in drivers.
+1. **The USB gadget.** The Pi's USB-C port can act as a USB *device*. `gadget/` sets up a standard USB Audio Class 2 function and a USB MIDI function through configfs, so the host uses its built-in drivers.
 2. **One clock.** JACK runs on the gadget, so the Pi follows the host's sample clock. Each USB device has its own clock, and often its own rate (48 kHz is common). For each device, `rpi-audiod` starts a pair of zita-ajbridge bridges that resample on the fly to keep it in step.
+   - **The USB host side.** Since 2026-11-14 the 26-channel link to the host uses a native bridge, `rpi-audio-hostbridge`, instead of zita. It talks to the gadget's ALSA device directly, resamples all 26 channels in one pass and follows the host's pace. It adds about 5 ms less delay and uses about a quarter of the CPU (numbers in [Performance](#performance)). `host_bridge = "zita"` in the configuration goes back to zita, and zita is also used when the native program is not built.
 3. **rpi-audiod** watches devices come and go and gives each one its block of gadget channels. It starts and stops the bridges, applies levels and mutes, and saves and loads presets. It also keeps the host fed, with silence if nothing else, because some hosts (the Akai Force) reset when the interface goes quiet while they stream.
 4. **MIDI.** Each MIDI port of a device gets a gadget cable of its own, through kernel sequencer connections. Cable 1 goes to `rpi-audiod` as the control port.
 
@@ -70,9 +71,10 @@ The full protocol is in [docs/MIDI.md](docs/MIDI.md).
 
 For the complete DAC/OLED/encoder build, use the [parts list with quantities and assembly instructions](docs/MANUAL.md#16-build-your-own-device). The short list below covers the USB hub itself.
 
-- A **Raspberry Pi 4** with its official power supply. A **Raspberry Pi 5** takes the same SD card and install: the gadget, the pHAT DAC and the OLED come up on it [Pi], but audio with a host and with USB devices has not been measured on a Pi 5 yet.
+- A **Raspberry Pi 5** with its official power supply. This is the reference board since 2026-11-07, and all the measurements in [Performance](#performance) are from it. A **Raspberry Pi 4** takes the same SD card and install and was the original platform; its numbers are older and some are marked as Pi 4.
+  - **Active cooling is recommended on a Pi 5.** With no fan it ran at 72–76 °C idle with the bridges and 79–81 °C with a host streaming, and the firmware starts cutting the clock at 80 °C. With a fan (the Pi 5's official Active Cooler, or any fan on its fan header) the same load stays at about 50 °C. See [Performance](#performance).
   - On a Pi 5 whose supply does not negotiate 5 A over USB-PD (a 3 A supply, or any supply behind the splitter), the firmware limits the USB-A ports to 600 mA in total. Power hungry devices then need their own supply or a powered hub.
-- A **USB-C data/power splitter**. We use the "USB-C/PWR Splitter" from 8086 (8086.net/p/usbcs). The Pi 4 has only one USB-C port, and it is both its power input and its gadget (device-mode) port. The splitter lets you feed power from the supply and send data to the host over separate connectors. Wiring we used: supply to POWER, DATA POWER to the Pi, USB2 DATA to the host.
+- A **USB-C data/power splitter**. We use the "USB-C/PWR Splitter" from 8086 (8086.net/p/usbcs). The Pi 4 and the Pi 5 each have only one USB-C port, and it is both the power input and the gadget (device-mode) port. The splitter lets you feed power from the supply and send data to the host over separate connectors. Wiring we used: supply to POWER, DATA POWER to the Pi, USB2 DATA to the host.
 - The USB audio and MIDI devices, on the Pi's **USB-A** ports.
 - A host with a USB port. Connect the Pi directly, not through a hub.
 
@@ -161,11 +163,60 @@ What has been tested:
 | Host | Result |
 |---|---|
 | Linux laptop | 26×26 at 16-bit: bit-exact tones in both directions; 10-minute duplex soak with no xruns; USB MIDI, SysEx and CC control |
-| Akai Force | MPC opens it at 26×26, 16-bit. 60-minute duplex soak with 0 xruns and 0 underflows, and MIDI control from an MPC track |
+| Akai Force | MPC opens it at 26×26, 16-bit. 60-minute duplex soak with 0 xruns and 0 underflows, and MIDI control from an MPC track (Pi 4, zita bridge). On a Pi 5 with the native bridge and a fan: 62-minute soak with a Tracker and a mixer attached, 0 xruns and 0 resyncs, and MPC kept its stream open. Latency with the Force as the host has not been measured, and nobody has listened for clicks yet |
 | macOS | Not tested |
 | Windows | Not tested. Windows' class driver (`usbaudio2.sys`) is documented to limit shared mode to 8 channels, so expect to need exclusive mode or ASIO, or a lower channel count |
 
 The Akai Force needs the Pi to be playing into the gadget whenever the host streams, even silence. Otherwise MPC resets or drops back to its internal audio. `rpi-audiod` does this for you, so run it (it starts at boot).
+
+## Performance
+
+All of this was measured on a **Raspberry Pi 5** [Pi], with a fan unless it says otherwise. Numbers are medians or maxima of the runs in `docs/hw/`; the sessions say how each was taken.
+
+### Latency (laptop as the host)
+
+The Pi's share of the round trip (audio in from the host, through the Pi, and back to the host), measured with `jack_iodelay` on a Linux laptop that has no real-time scheduling. **Absolute values are good to about ±2 ms; the differences between rows are the robust part.**
+
+| USB host bridge | Pi share, median | Range |
+|---|---|---|
+| Host-clock mode (no resampling) | 5.5 ms | 2.6–15.9 ms |
+| Native, 0.5 ms margin | 5.1 ms | 4.4–6.8 ms |
+| Native, 1.0 ms margin | 7.8 ms | 6.0–8.9 ms |
+| **Native, 1.5 ms margin (default)** | **8.6 ms** | 6.7–11.1 ms |
+| zita | 14.8 ms | 13.6–18.6 ms |
+
+- The native bridge at the default margin takes **5–6 ms off** zita's round trip, and sits about 1.5–3 ms above host-clock mode. The two methods in the session agree: 6.5 ms against 11.7 ms for zita by the first, 8.6 against 14.8 by the second.
+- The bridge reports its delay to JACK: 107 frames on the capture side and 104 on the playback side, so JACK's latency queries include it.
+- **Margin.** Below 1.5 ms the laptop saw 1–4 resyncs per 12-second open, for a reason that is not known. With the Akai Force as the host the 0.75 ms margin ran 10.5 minutes with 0 resyncs, which points at the laptop rather than the bridge, but that is a single run. 1.5 ms stays the default.
+- **JACK on the pHAT DAC at 64×3** (1.3 ms) ran 3 minutes with 0 xruns and the fan on. Without the fan it gave 8 xruns in 2 minutes. It is a short test, so the Pi stays at 128×3 until a longer run.
+- **Not measured:** the round trip with the Force as the host. The Force path has only been checked for stability.
+
+### CPU and integrity
+
+| 26 channels each way, % of one core | zita | native (1.5 ms) |
+|---|---|---|
+| Capture + playback bridges | 22.4 | 5.7–5.9 |
+| jackd | 1.6 | 1.7–1.9 |
+
+- **Integrity:** with the laptop, 26 tones (110·k Hz at −12 dBFS) went through the Pi and back. All 26 channels came back in order at −12.0 dBFS with no glitches, and there were 0 resyncs in 300 s. The resampler is flat from 110 Hz to 10 kHz and −0.66 dB at 18 kHz (44.1 to 48 kHz, quality 32), measured on a bench outside the repo.
+- **Stability:** the buffer stays within 53–78 frames around its 66-frame target, with ±36–118 ppm of clock correction, and at most 0.4 ms of lateness inside the 2.7 ms cycle.
+
+### Temperature and the fan
+
+| Pi 5 | Temperature | Throttled |
+|---|---|---|
+| No fan, idle with the bridges | 72–76 °C | no |
+| No fan, Force streaming | 79–81 °C, then 74 → 79.6 °C in 6 minutes | clock cut at 80 °C [ext] |
+| **Fan, 62 min with the Force, Tracker and mixer** | **49–53 °C** (fan about 3,000 rpm) | no, ARM at 2.4 GHz |
+| Fan, all 4 cores plus memory copies for 10 min, same audio | max 67.5 °C (fan up to about 7,000 rpm) | no |
+
+- **The fan makes the difference.** With it, the 62-minute soak had **0 xruns and 0 resyncs**, and the 10-minute stress run had none either. The lateness inside the cycle rose from about 0.37 ms to 0.73 ms under the stress. Without a fan the Pi sits at the throttling point as soon as a host streams, so we do not rely on any no-fan figure for latency.
+- **What to fit:** a fan on the Pi 5's fan header is enough. The Pi 5 drives it by temperature on its own; nothing in `rpi-audio` controls it.
+- **A known blip:** some restarts of `rpi-audiod` give 1–2 resyncs, and once 2 xruns, about 10 seconds after starting (3 of 6 restarts). It only happens at start-up, and the cause is not known.
+
+### Power cuts
+
+With `--read-only` the root file system lives in RAM, so unplugging the Pi cannot corrupt it; the settings are saved to the boot partition with two alternating checksummed copies. It is installed and boots on the reference Pi 5 (2026-11-17) with every service running. **The save-and-restore cycle with a real setting, and 20 random power cuts, have not been run yet.** Until they are, shut the Pi down from the OLED's Power menu or with `sudo systemctl poweroff` when you can.
 
 ## Everyday use
 
