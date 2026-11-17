@@ -298,7 +298,9 @@ static int open_device(const char *device, snd_pcm_uframes_t wanted) {
     if ((error = snd_pcm_hw_params_set_channels(pcm, hw, channels)) < 0) return fail("channels", error);
     if ((error = snd_pcm_hw_params_set_rate(pcm, hw, rate, 0)) < 0) return fail("rate", error);
     if ((error = snd_pcm_hw_params_set_buffer_size_near(pcm, hw, &size)) < 0) return fail("buffer size", error);
-    chunk = size / 8;
+    // About 1 ms periods: snd-usb-audio sizes its playback URBs from the period and moves the buffer
+    // a whole URB at a time, so a longer period makes the fill swing by that much each cycle.
+    chunk = rate / 1000 ? rate / 1000 : 1;
     if ((error = snd_pcm_hw_params_set_period_size_near(pcm, hw, &chunk, NULL)) < 0)
         return fail("period size", error);
     if ((error = snd_pcm_hw_params(pcm, hw)) < 0) return fail("hw params", error);

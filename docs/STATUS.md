@@ -17,10 +17,13 @@
   - Envío: 5 resyncs, todos en los primeros 5 min; luego, ninguno en 37 min.
   - Xruns: 16 en los primeros 5 min; luego, 0.
   - El margen total del puente queda en 1,5 ms; antes eran 3,0. No se ha escuchado ni medido la latencia real con la Force.
+- [código] **Puentes de dispositivo nativos** (`2292486`): `[bridge] mode = "native"` usa `rpi-audio-hostbridge` en vez de zita para el Tracker, el mezclador y la GP-150, con `margin_in_ms` y `margin_out_ms`. Por defecto sigue `zita`. `hostbridge.c` abre ahora los dispositivos con periodos ALSA de ~1 ms: con periodos de 128, snd-usb-audio movía el buffer de reproducción a saltos de 128 tramas.
+- [Pi] **Probado en la Pi con la Force conectada** (overlay): con entrada 1,0 / salida 2,0, las entradas declaran 80–83 tramas frente a 160–185 de zita 64×2 (**~1,7–2,1 ms menos**), y la salida del Tracker 128 frente a 185 (~1,2 ms menos). En 10 min, resyncs solo en el primer minuto y luego 0 resyncs y 0 xruns. Con salida a 1,5 ms, la del Tracker da resyncs cada 1–2 min. No se ha escuchado. [Sesión](hw/2026-11-17-latency.md#puentes-de-dispositivo-nativos-14301515).
 - **Siguiente:**
   - Hacer durable la configuración (envío 1,0 / retorno 0,5 / jackd 64): pasar a `10-local-tuning.toml` y desplegar sin `--volatile`. Hace falta quitar el overlay y reiniciar dos veces, nunca con la Force en marcha.
   - Aclarar la ráfaga del arranque: muestrear sin abrir una sesión SSH por muestra.
-  - Medir la latencia de ida y vuelta con la Force.
+  - Escuchar los puentes de dispositivo nativos y un soak largo; si van bien, pasar `[bridge] mode` a `native` por defecto (entrada 1,0, salida 2,0).
+  - Incluir `zz-native-devices.toml` en la configuración durable.
 
 ## Actualización del 16 de noviembre: el puente nativo con la Force, y rutas nuevas
 
