@@ -1,4 +1,10 @@
-# Estado: 2026-11-16
+# Estado: 2026-11-17
+
+## Actualización del 17 de noviembre: latencia con la Force, y margen por sentido
+
+- [Pi, Force] **Soak de 42 min con jackd a 64×3 y el margen del puente a 0,75 ms**, con `rpi-audio.d/zz-perf-trial.toml`, que es temporal y está en el overlay. 13 xruns y 7 resyncs en los primeros ~90 s tras reiniciar `rpi-audiod`. Después, 40 min con **0 xruns, 0 resyncs en IN y 2 en OUT**; uno coincide con `apt-daily-upgrade`. Buffer en 24–40 sobre 33, retraso dentro del ciclo de hasta 482 µs, 44–52 °C. No se ha escuchado ni medido la latencia con la Force. [Sesión](hw/2026-11-17-latency.md).
+- [código] **Margen por sentido** (`10c8ac1`): `[usb] host_margin_send_ms` (Pi → host) y `host_margin_return_ms` (host → Pi); los dos toman `host_margin_ms` por defecto. En envío el retraso del ciclo se come el margen; en retorno, no. Hay un test nuevo y la suite pasa con Python 3.12 (544 pasan, 13 se saltan). **Sin desplegar.**
+- **Siguiente:** desplegar y probar retorno a 0,5–0,75 ms y envío a 1,0 ms; repetir el arranque para ver si la ráfaga de xruns es de 64×3; decidir si se paran los timers de apt en la Pi.
 
 ## Actualización del 16 de noviembre: el puente nativo con la Force, y rutas nuevas
 
