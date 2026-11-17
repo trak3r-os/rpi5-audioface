@@ -8,7 +8,7 @@ Ficha de un host concreto. El código de rpi-audio no depende de ella; aquí se 
 |---|---|---|
 | Solo **44.100 Hz**. Con otra frecuencia, MPC se queda en 2-in/2-out | `GADGET_SRATE=44100` | [ext] log de un MPC One; notas de la Force 3.1.1: "sample rate is locked to 44.1 kHz" |
 | Formato: MPC usa **S32_LE** con su códec interno; con el gadget acepta S16_LE | `GADGET_SSIZE` 2 o 4 | [Force] |
-| Periodo de **128**, fijo: no hay ajuste de buffer en standalone (salvo el add-on `customBufferSize` de MockbaMod, abajo). Buffers de 256 en captura y 384 en reproducción (el periodo de la Pi es independiente) | — | [Force] |
+| Periodo de **128**, fijo en la 3.9.1: no hay ajuste de buffer en standalone (salvo el add-on `customBufferSize` de MockbaMod, abajo). Buffers de 256 en captura y 384 en reproducción (el periodo de la Pi es independiente). **La 3.10.1 añade «Block Size»** en Preferences > Audio Device, como mejora experimental: Preferences > Enhancements > Enable Enhancements y luego «Advanced audio settings». Al cambiarlo se reinicia el audio. Valores posibles y comportamiento con el gadget: sin probar | — | [Force] 3.9.1 (2026-11-17: Audio Device solo muestra el dispositivo y «32 inputs/outputs»); [ext] notas de la 3.10.1 |
 | **Entrada y salida al mismo ritmo.** MPC enlaza los dos streams (`snd_pcm_link`) y no tolera que el IN y el OUT del gadget vayan a ritmos distintos | Pitch igual en los dos sentidos | [Force], `docs/STATUS.md` |
 | **Nunca "UAC2_Gadget"** en el nombre: MPC ignora esas tarjetas | `GADGET_PRODUCT`/`GADGET_MANUFACTURER` | [ext] mpc-addin-usb-audio |
 | MPC abre primero la captura; hay que ofrecer los dos sentidos | Las dos máscaras de canales | [ext] |
