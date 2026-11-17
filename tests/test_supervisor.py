@@ -1528,7 +1528,18 @@ def test_hub_bridges_the_gadget_natively_by_default(monkeypatch, tmp_path):
     assert cmd[cmd.index("--client") + 1] == "usb_host_out" and cmd[cmd.index("--direction") + 1] == "playback"
     assert cmd[cmd.index("--rate") + 1] == "44100" and cmd[cmd.index("--margin-us") + 1] == "1500"
     cmd = d.host_bridge_command("zita-a2j", "usb_host_in", 48000)
-    assert cmd[cmd.index("--direction") + 1] == "capture"
+    assert cmd[cmd.index("--direction") + 1] == "capture" and cmd[cmd.index("--margin-us") + 1] == "1500"
+
+
+def test_hub_margin_can_differ_per_direction(monkeypatch, tmp_path):
+    w, d = make(monkeypatch, tmp_path, channels=26, engine={"mode": "hub"},
+                usb={"host_margin_ms": 1.0, "host_margin_return_ms": 0.5, "host_margin_send_ms": "x"})
+    monkeypatch.setattr(daemon.os, "access", lambda path, mode: True)
+    send = d.host_bridge_command("zita-j2a", "usb_host_out", 44100)
+    back = d.host_bridge_command("zita-a2j", "usb_host_in", 44100)
+    assert send[send.index("--margin-us") + 1] == "1000"   # not a number: host_margin_ms, with a warning
+    assert back[back.index("--margin-us") + 1] == "500"
+    assert logged(w, "host_margin_send_ms 'x' is not a number")
 
 
 def test_hub_uses_zita_for_the_gadget_when_asked_or_when_the_native_bridge_is_not_built(monkeypatch, tmp_path):

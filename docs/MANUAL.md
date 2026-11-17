@@ -521,10 +521,14 @@ Both settings are in `[usb]` in `/etc/rpi-audio/rpi-audio.toml` (or a drop-in in
 [usb]
 host_bridge = "native"   # or "zita"
 host_margin_ms = 1.5     # audio kept buffered per direction, 0.25-20 ms
+# host_margin_send_ms = 1.5    # Pi to host only (defaults to host_margin_ms)
+# host_margin_return_ms = 1.5  # host to Pi only (defaults to host_margin_ms)
 host_quality = 32        # resampler half-length in frames, 8-96
 ```
 
 `host_margin_ms` is the trade-off. A lower margin means less delay, but the bridge then has less room when the system is late, and it **resyncs** (jumps back to its margin, with a small glitch). `sudo rpi-audiod status` shows the buffer's smallest, average and largest fill and the resync count; lower the margin only while the smallest value stays well above zero.
+
+The two directions can be set apart. Send (Pi to host) must cover how late the bridge runs in a cycle, because what it writes late is already due; status shows that as the bridge's lateness. Return (host to Pi) only has to cover the jitter of the host's USB packets, since a late cycle still finds what the host delivered, so it can usually go lower than send.
 
 Measured on a Raspberry Pi 5 with a Linux laptop as the host (the Pi's share of the round trip; absolute values are good to about ±2 ms):
 

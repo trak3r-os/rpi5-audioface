@@ -78,6 +78,12 @@ reserve_out = [1, 2]
 # late in a cycle the bridge runs: `rpi-audiod status` shows the buffer's min/avg/max and the
 # resyncs (the times it ran out). Lower it while the minimum stays well above 0.
 # host_margin_ms = 1.5
+# The same per direction, when set; each defaults to host_margin_ms. Send (Pi to host,
+# usb_host_out) has to cover the latest the bridge runs in a cycle, since what it writes late
+# is already due. Return (host to Pi, usb_host_in) only covers the jitter of the host's
+# packets: a late cycle reads what the host already delivered, so it can usually go lower.
+# host_margin_send_ms = 1.5
+# host_margin_return_ms = 1.5
 # Native bridge: half the resampling filter's length in frames (8-96). 32 is ~86 dB of
 # stopband; 24 is ~67 dB and 0.2 ms less per direction; 16 is ~47 dB.
 # host_quality = 32

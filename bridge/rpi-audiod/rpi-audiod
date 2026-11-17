@@ -918,7 +918,12 @@ class Daemon:
             log(f"rpi-audiod: [usb] host_bridge {self.host_bridge!r} is not zita or native; using native")
             self.host_bridge = "native"
         self.host_bridge_missing = False   # native asked for, helper not built: said once
-        self.host_margin_us = self.usb_number("host_margin_ms", 1.5, 0.25, 20.0, lambda v: round(v * 1000))
+        # The two directions need different room: a late cycle eats into what is queued for the host
+        # (send) but not into what the host delivered (return), so each can be set on its own.
+        margin = self.usb_number("host_margin_ms", 1.5, 0.25, 20.0, float)
+        self.host_margin_us = {direction: self.usb_number(f"host_margin_{key}_ms", margin, 0.25, 20.0,
+                                                          lambda v: round(v * 1000))
+                               for direction, key in (("playback", "send"), ("capture", "return"))}
         self.host_quality = self.usb_number("host_quality", 32, 8, 96, int)
         self.slots_stamp = None
         self.unknown_host = None   # the host profile already warned about
@@ -967,9 +972,10 @@ class Daemon:
         helper = Path(__file__).resolve().parent / "audio/rpi-audio-hostbridge"
         if self.host_bridge == "native":
             if os.access(helper, os.X_OK):
+                direction = "capture" if tool == "zita-a2j" else "playback"
                 return [str(helper), "--client", client, "--device", f"hw:CARD={self.usb_card}",
-                        "--direction", "capture" if tool == "zita-a2j" else "playback", "--rate", str(rate),
-                        "--channels", str(self.usb_channels), "--margin-us", str(self.host_margin_us),
+                        "--direction", direction, "--rate", str(rate), "--channels", str(self.usb_channels),
+                        "--margin-us", str(self.host_margin_us[direction]),
                         "--quality", str(self.host_quality)]
             if not self.host_bridge_missing:
                 log(f"rpi-audiod: [usb] host_bridge is native but {helper} is not built; using zita")

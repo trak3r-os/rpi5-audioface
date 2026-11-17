@@ -31,6 +31,7 @@ En Hub, el gadget se puentea con `rpi-audio-hostbridge` (`bridge/audio/hostbridg
 - **Retardo añadido por sentido:** el margen más el filtro (`host_quality` tramas; 32 = 0,7 ms y ~86 dB), además del periodo de JACK. zita añade ~5 ms por sentido (periodo ALSA + periodo JACK + filtro, y 4 periodos en reproducción).
 - **Los streams no se paran por xrun** (umbral de parada en el límite, y silencio automático en reproducción): si un ciclo llega tarde, el host recibe silencio al ritmo correcto y el puente vuelve de un salto a su margen. Cada salto cuenta como «USB resyncs» en la sesión.
 - **Para ajustarlo:** `rpi-audiod status` muestra por sentido el buffer mínimo/medio/máximo en tramas (referido al inicio del ciclo), la corrección en ppm, los resyncs y lo tarde que corre el puente dentro del ciclo. Se baja `host_margin_ms` mientras el mínimo quede lejos de 0.
+- **Margen por sentido:** `host_margin_send_ms` (Pi → host, `usb_host_out`) y `host_margin_return_ms` (host → Pi, `usb_host_in`), ambos con `host_margin_ms` por defecto. En envío el retraso del ciclo se come el margen (lo que se escribe tarde ya toca), así que tiene que cubrir el retraso máximo más la granularidad de los paquetes USB. En retorno el retraso no lo reduce (se lee lo que el host ya entregó): solo cubre la variación de llegada de los paquetes, y suele poder ir más bajo.
 - `host_period` no se aplica al puente nativo. El buffer del gadget tiene que dar para dos periodos de JACK más márgenes; si no, el puente lo dice y no arranca.
 
 ## Transporte y SDP
