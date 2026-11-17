@@ -231,9 +231,24 @@ def test_uninstall_and_purge(root):
     assert not (root / "etc/modules-load.d/rpi-audio.conf").exists()
     assert not (root / "etc/systemd/journald.conf.d/rpi-audio.conf").exists()
     assert (root / "etc/rpi-audio/gadget.env").exists()
+    assert not (root / "etc/systemd/system/apt-daily.timer").is_symlink()
     r = run(root, "--uninstall", "--purge")
     assert r.returncode == 0
     assert not (root / "etc/rpi-audio").exists()
+
+
+def test_apt_timers_masked_with_enable_and_kept_otherwise(root):
+    units = root / "etc/systemd/system"
+    units.mkdir(parents=True)
+    (units / "apt-daily.timer").symlink_to("/lib/systemd/system/apt-daily.timer")
+    r = run(root, "--no-boot-config", "--no-enable")
+    assert r.returncode == 0, r.stderr
+    assert os.readlink(units / "apt-daily.timer") == "/lib/systemd/system/apt-daily.timer"
+    r = run(root, "--no-boot-config")
+    assert r.returncode == 0, r.stderr
+    for t in ("apt-daily.timer", "apt-daily-upgrade.timer"):
+        assert os.readlink(units / t) == "/dev/null", t
+    assert "masked apt-daily.timer apt-daily-upgrade.timer" in r.stdout
 
 
 def test_uninstall_prints_how_to_revert_overlay(root):

@@ -15,7 +15,7 @@
 #                      (rpi-audiod settings for that host, e.g. akai-force)
 #   --no-enable        leave the boot enable state of the units as it is (by default
 #                      rpi-audio-gadget, rpi-audiod and rpi-audio-cpu are enabled,
-#                      rpi-audio-keepalive disabled)
+#                      rpi-audio-keepalive disabled, apt's daily timers masked)
 #   --force-config     overwrite /etc/rpi-audio/gadget.env and rpi-audio.toml even if they differ
 #                      (by default an existing, different file is kept and the repo's version is
 #                      written next to it as *.new)
@@ -87,6 +87,10 @@ OVERLAY='dtoverlay=dwc2,dr_mode=peripheral'
 units="rpi-audio-gadget rpi-audiod rpi-audio-keepalive rpi-audio-cpu rpi-audio-ui"
 # --read-only's units: always installed, only enabled with --read-only.
 persist_units="rpi-audio-persist-restore.service rpi-audio-persist.path rpi-audio-persist.service"
+# An audio appliance does not update itself: apt's daily timers start downloads and upgrades at random times,
+# and that load shows up as resyncs of the host bridge (docs/hw/2026-11-17-latency.md). Masked when the units
+# are enabled, unmasked by --uninstall. Update by hand: sudo apt update && sudo apt full-upgrade.
+apt_timers="apt-daily.timer apt-daily-upgrade.timer"
 packages="jackd2 jack-example-tools zita-ajbridge gcc libjack-jackd2-dev libasound2-dev sudo"
 
 say() { echo "$tag: $*"; }
@@ -287,6 +291,12 @@ if ((uninstall)); then
     if [[ -L $BIN/$b ]]; then rm -f "$BIN/$b"; fi
   done
   rm -f "$MODULES" "$JOURNALD" "$POWER_POLICY" "$WATCHDOG_CONF"
+  for t in $apt_timers; do
+    if [[ $(readlink "$UNITDIR/$t" 2>/dev/null) == /dev/null ]]; then rm -f "$UNITDIR/$t"; fi
+  done
+  sysrun systemctl daemon-reload
+  sysrun systemctl start $apt_timers 2>/dev/null || true
+  say "unmasked $apt_timers: the system updates itself again"
   if ((! staging)); then uninstall_fs_isoc_pad; fi
   say "removed the units, $LIB, the rpi-audiod link, the modules-load, journald and watchdog drop-ins and the $FSIP module"
   if ((purge)); then
@@ -735,6 +745,10 @@ if ((enable)); then
   sysrun systemctl enable rpi-audio-gadget.service rpi-audiod.service rpi-audio-cpu.service
   sysrun systemctl restart rpi-audio-cpu.service
   if ((hat)); then sysrun systemctl enable rpi-audio-ui.service; fi
+  for t in $apt_timers; do ln -sfn /dev/null "$UNITDIR/$t"; done
+  sysrun systemctl daemon-reload
+  sysrun systemctl stop $apt_timers
+  say "masked $apt_timers: the system no longer updates itself (by hand: sudo apt update && sudo apt full-upgrade)"
 fi
 # The display service runs the new code at once; it has no audio to interrupt, and without a display it only waits.
 if ((enable && hat)); then

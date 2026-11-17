@@ -127,6 +127,8 @@ Run only one of the two `install.sh` lines. Use `--host akai-force` if the host 
 
 The installer also enables `rpi-audio-cpu.service`, which keeps the CPU governor at `performance` so the audio threads do not wake up on a slowed clock. `sudo systemctl disable --now rpi-audio-cpu` goes back to `ondemand`.
 
+It also masks apt's daily timers (`apt-daily.timer` and `apt-daily-upgrade.timer`). They start downloads and upgrades at random times, and that load can make the host bridge skip. The Pi then no longer updates itself: run `sudo apt update && sudo apt full-upgrade` by hand when no host is playing. `--uninstall` unmasks them.
+
 To update, run `git pull && sudo ./install.sh`. To remove it, run `sudo ./install.sh --uninstall`. Add `--purge` to also delete the settings and the saved state.
 
 The gadget is created once at boot by `rpi-audio-gadget.service`. Do not unbind and rebind it in a loop: repeated rebinds can lock up the Pi's USB controller.
