@@ -564,14 +564,18 @@ def device_bridge_settings(b):
                                           f"from {low} to {high}; using {default}")
             return default
         return value
-    mode = b.get("mode", "zita")
+    mode = b.get("mode", "native")
     if mode not in ("zita", "native"):
-        warn_once(("mode", repr(mode)), f"rpi-audiod: [bridge] mode {mode!r} is not zita or native; using zita")
-        mode = "zita"
-    margin = number("margin_ms", 2.0, 0.25, 20.0)
+        warn_once(("mode", repr(mode)), f"rpi-audiod: [bridge] mode {mode!r} is not zita or native; using native")
+        mode = "native"
+    # Capture 1.0 ms, playback 2.0 ms: a 60-min soak with a host streaming had no resync
+    # (docs/hw/2026-11-17-latency.md). margin_ms, when set, is the default of both.
+    margin = {IN: 1.0, OUT: 2.0}
+    if "margin_ms" in b:
+        margin = dict.fromkeys(margin, number("margin_ms", 2.0, 0.25, 20.0))
     return {"mode": mode, "quality": int(number("quality", 32, 8, 96)),
-            IN: round(number("margin_in_ms", margin, 0.25, 20.0) * 1000),
-            OUT: round(number("margin_out_ms", margin, 0.25, 20.0) * 1000)}
+            IN: round(number("margin_in_ms", margin[IN], 0.25, 20.0) * 1000),
+            OUT: round(number("margin_out_ms", margin[OUT], 0.25, 20.0) * 1000)}
 
 
 class Bridge:

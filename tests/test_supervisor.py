@@ -563,7 +563,7 @@ def bridge_for(w, direction=IN, start=1, **kw):
 
 def test_bridge_command_and_cfg(monkeypatch, tmp_path):
     w, d = make(monkeypatch, tmp_path)
-    cfg = {"bridge": {"period": 128, "periods": 3}}
+    cfg = {"bridge": {"mode": "zita", "period": 128, "periods": 3}}
     a2j, j2a = bridge_for(w, IN), bridge_for(w, OUT)
     a2j.tick(cfg, w.now)
     j2a.tick(cfg, w.now)
@@ -571,7 +571,7 @@ def test_bridge_command_and_cfg(monkeypatch, tmp_path):
                              "-p", "128", "-n", "3"]
     assert j2a.child.cmd[:3] == ["zita-j2a", "-j", "mixer_out"]
     b = bridge_for(w, IN)
-    b.tick({"bridge": {}}, w.now)
+    b.tick({"bridge": {"mode": "zita"}}, w.now)
     assert b.child.cmd[-4:] == ["-p", "256", "-n", "2"]
 
 
@@ -601,7 +601,22 @@ def test_native_device_bridge_bad_values_use_their_defaults(monkeypatch, tmp_pat
     assert logged(w, "margin_ms 0.1 is not a number") and logged(w, "quality 'high' is not a number")
     b = bridge_for(w, OUT)
     b.tick({"bridge": {"mode": "fast"}}, w.now)
-    assert b.child.cmd[0] == "zita-j2a" and logged(w, "mode 'fast' is not zita or native")
+    assert b.child.cmd[0].endswith("rpi-audio-hostbridge") and logged(w, "mode 'fast' is not zita or native")
+
+
+def test_native_device_bridge_is_the_default_with_1_0_in_and_2_0_out(monkeypatch, tmp_path):
+    w, d = make(monkeypatch, tmp_path)
+    monkeypatch.setattr(daemon.os, "access", lambda path, mode: True)
+    margins = {}
+    for direction in (IN, OUT):
+        b = bridge_for(w, direction)
+        b.tick({"bridge": {}}, w.now)
+        assert b.child.cmd[0].endswith("rpi-audio-hostbridge")
+        margins[direction] = b.child.cmd[b.child.cmd.index("--margin-us") + 1]
+    assert margins == {IN: "1000", OUT: "2000"}
+    b = bridge_for(w, OUT)
+    b.tick({"bridge": {"margin_ms": 1.5}}, w.now)   # margin_ms sets both directions
+    assert b.child.cmd[b.child.cmd.index("--margin-us") + 1] == "1500"
 
 
 def test_native_device_bridge_falls_back_to_zita_when_not_built(monkeypatch, tmp_path):

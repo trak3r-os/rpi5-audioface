@@ -540,6 +540,21 @@ Measured on a Raspberry Pi 5 with a Linux laptop as the host (the Pi's share of 
 
 The native bridge is 5–6 ms faster than zita and uses about a quarter of the CPU (5.7–5.9 % of one core for 26 channels each way, against 22.4 %). 1.5 ms stays the default because the laptop saw resyncs at lower values; with an Akai Force the 0.75 ms margin ran 10.5 minutes without one, but that is a single run. Latency with the Force as the host has not been measured. Details: `docs/hw/2026-11-11-native-bridge.md` and `docs/hw/2026-11-13-perf-fan.md` (in Spanish).
 
+### USB device bridges
+
+Each USB audio device has its own clock, so each direction of each device gets a bridge that resamples it to the engine. Since 17 November 2026 these use `rpi-audio-hostbridge` too, the same program as the host link. Settings are in `[bridge]`:
+
+```toml
+[bridge]
+mode = "native"          # or "zita" (zita-ajbridge, with period and periods)
+# margin_in_ms = 1.0     # audio kept buffered on capture, 0.25-20 ms
+# margin_out_ms = 2.0    # the same on playback
+# margin_ms = 2.0        # sets both
+# quality = 32           # resampler half-length in frames, 8-96
+```
+
+The defaults ran 60 minutes on a Raspberry Pi 5 with a Tracker, a mixer and a guitar processor attached and a host streaming: after a 2-second stall of the local DAC, 47 minutes with no resyncs. Nobody has listened for clicks yet. If a device's bridge resyncs (`sudo rpi-audiod status`), raise its margin, or set `mode = "zita"`. Details: `docs/hw/2026-11-17-latency.md` (in Spanish).
+
 ### Cooling the Pi 5
 
 **Fit a fan.** A Pi 5 with no cooling ran at 72–76 °C with the bridges running and 79–81 °C with a host streaming. At 80 °C the firmware lowers the clock, which can break the audio up. With a fan on the Pi 5's fan header (the Pi's own driver sets its speed from the temperature) the same load stayed at **49–53 °C** for a 62-minute run with a host, a mixer and a multichannel interface, with no xruns and no resyncs. With all four cores busy as well it peaked at 67.5 °C and still had none. The Pi 4 has no fan header; a heatsink or case fan helps there too.

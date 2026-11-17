@@ -22,12 +22,12 @@
 - [Pi] **Soak de 60 min de los puentes nativos de dispositivo** (entrada 1,0 / salida 2,0): tras un corte a las 15:34:50, **47 min con 0 resyncs y 0 xruns** en los cuatro puentes; buffer mínimo 23–33 por puente, 49 °C. Los fallos anteriores son de los clientes de prueba (`jack_iodelay`) y del corte. [Sesión](hw/2026-11-17-latency.md#soak-de-los-puentes-nativos-de-dispositivo-15221622-60-min).
 - [Pi] **Hallazgo: cortes de 2 s por el pHAT.** Dos veces (15:22:58 y 15:34:50) el DMA del I2S del pHAT da `Bad descriptor` y jackd se queda 2 s sin reloj (`ALSA: poll time out`): se para todo el grafo y todos los puentes hacen resync. Las dos veces coinciden con una enumeración del gadget por la Force y con manipular cables; causa sin confirmar [?].
 - [Pi, usuario] **pHAT → mezclador → `codec_in` sin medir:** el tono no llega al mezclador y con auriculares en el pHAT no se oye nada; parece mal asentado o en mute (XSMT). En la Pi 5 nunca se ha oído. Una lectura de 584 tramas era ruido de masa (peine de 750 Hz = 48000/64), no el tono. [Sesión](hw/2026-11-17-latency.md#phat--mezclador--codec_in-15201545-sin-medida).
+- [código] **Puentes de dispositivo nativos por defecto** (decisión del usuario, tras el soak y sin escucharlos todavía): `[bridge] mode` vale `"native"` con entrada 1,0 ms y salida 2,0 ms; `margin_ms` fija los dos; `mode = "zita"` vuelve a zita, y zita se sigue usando si `rpi-audio-hostbridge` no está compilado. README, MANUAL y OUTPUTS al día.
 - **Siguiente:**
   - Reasentar el pHAT, comprobar que suena con auriculares y repetir `jack_iodelay` `system:playback_1` → `codec_in:capture_1`. Vigilar si vuelven los `Bad descriptor` del DMA.
   - Hacer durable la configuración (envío 1,0 / retorno 0,5 / jackd 64): pasar a `10-local-tuning.toml` y desplegar sin `--volatile`. Hace falta quitar el overlay y reiniciar dos veces, nunca con la Force en marcha.
   - Aclarar la ráfaga del arranque: muestrear sin abrir una sesión SSH por muestra.
-  - Escuchar los puentes de dispositivo nativos (el soak ya está); si suenan bien, pasar `[bridge] mode` a `native` por defecto (entrada 1,0, salida 2,0).
-  - Incluir `zz-native-devices.toml` en la configuración durable.
+  - Escuchar los puentes de dispositivo nativos (ya son el modo por defecto): clics o cortes en el Tracker, el mezclador y la GP-150.
 
 ## Actualización del 16 de noviembre: el puente nativo con la Force, y rutas nuevas
 

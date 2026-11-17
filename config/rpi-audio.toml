@@ -37,16 +37,18 @@ ttl = 1                     # multicast stays on the local network
 http_port = 8080            # SDP download: http://PI-IP:8080/network-rtp.sdp; 0 disables HTTP
 
 [bridge]
-# One bridge per device direction. mode = "zita": zita-a2j / zita-j2a, with this period
-# and number of periods. mode = "native": rpi-audio-hostbridge (bridge/audio/hostbridge.c),
-# as for the gadget: it keeps margin_ms of audio in the device's buffer (0.25 to 20;
-# margin_in_ms / margin_out_ms set capture / playback alone) and resamples with
-# quality 8 to 96. Falls back to zita if the helper is not built.
-mode = "zita"
+# One bridge per device direction. mode = "native" (the default): rpi-audio-hostbridge
+# (bridge/audio/hostbridge.c), as for the gadget: it keeps a margin of audio in the device's
+# buffer, 0.25 to 20 ms (margin_in_ms for capture, 1.0 by default; margin_out_ms for
+# playback, 2.0; margin_ms sets both) and resamples with quality 8 to 96.
+# mode = "zita": zita-a2j / zita-j2a, with this period and number of periods; also used
+# when the native helper is not built.
+mode = "native"
+# margin_in_ms = 1.0
+# margin_out_ms = 2.0
+# quality = 32
 period = 256
 periods = 2
-# margin_ms = 2.0
-# quality = 32
 # Device rate: the first of these the device supports, otherwise its highest.
 # 48000 first: a PCM2902 (Behringer mixers) failed to capture at 44100 next to
 # another full-speed device (docs/hw/2026-10-29-f2-usb-devices.md).

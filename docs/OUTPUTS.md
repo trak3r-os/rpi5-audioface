@@ -10,6 +10,7 @@ El modo `hub` usa el pHAT como reloj local a 48 kHz. El grafo JACK continúa aun
 |---|---|---|
 | pHAT DAC | Puertos JACK `system:playback_N` | Salida local del motor Hub/Standalone |
 | Host USB | `rpi-audio-hostbridge`, un proceso por sentido. Opcional: `zita-j2a` y retorno `zita-a2j` (`[usb] host_bridge = "zita"`) | Puentes por sentido y frecuencia del gadget; conservan su número de canales |
+| Dispositivos USB | `rpi-audio-hostbridge`, un proceso por sentido y dispositivo (desde el 2026-11-17; entrada 1,0 ms, salida 2,0 ms). Opcional: zita (`[bridge] mode = "zita"`) | Remuestrean cada dispositivo al reloj del motor |
 | Network RTP | Adaptador nativo JACK → RTP L16 estéreo | Envío UDP, RTCP y descripción SDP; desactivado inicialmente |
 | Link Audio | Adaptador nativo con SDK oficial Ableton Link 4.1.1 fijado por commit | Envío estéreo con descubrimiento y suscripción; desactivado inicialmente |
 
