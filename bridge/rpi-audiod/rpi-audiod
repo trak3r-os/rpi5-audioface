@@ -3,8 +3,8 @@
 """rpi-audiod: keeps the gadget fed and bridges USB audio and MIDI devices to it (docs/PLAN.md).
 
 While the host streams both ways, it runs jackd on the gadget (mode A) and, for every USB
-audio card, a zita-a2j / zita-j2a bridge per direction, connected to that device's gadget
-channels. In hub mode the gadget itself is bridged by rpi-audio-hostbridge (bridge/audio/hostbridge.c,
+audio card, a zita-a2j / zita-j2a bridge per direction (or rpi-audio-hostbridge with [bridge]
+mode = "native"), connected to that device's gadget channels. In hub mode the gadget itself is bridged by rpi-audio-hostbridge (bridge/audio/hostbridge.c,
 lower latency), or by zita like the devices with [usb] host_bridge = "zita". While the host only
 records from the Pi, it plays silence instead: some hosts drop the gadget when nothing plays
 into it (docs/hw/2026-10-29-f1-force.md). When the gadget has USB MIDI ports, every MIDI port
@@ -543,8 +543,40 @@ def scan(cfg, profiles, cache):
     return found, cards
 
 
+HOSTBRIDGE = "audio/rpi-audio-hostbridge"   # next to this script, built by bridge/audio/Makefile
+_warned = set()                             # bad [bridge] values already logged
+
+
+def warn_once(key, text):
+    if key not in _warned:
+        _warned.add(key)
+        log(text)
+
+
+def device_bridge_settings(b):
+    """The [bridge] settings of the native device bridge, checked: mode ("zita" or "native"), the buffer
+    margin per direction in microseconds, and the resampler quality. A bad value is logged once and
+    replaced by its default."""
+    def number(key, default, low, high):
+        value = b.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:
+            warn_once((key, repr(value)), f"rpi-audiod: [bridge] {key} {value!r} is not a number "
+                                          f"from {low} to {high}; using {default}")
+            return default
+        return value
+    mode = b.get("mode", "zita")
+    if mode not in ("zita", "native"):
+        warn_once(("mode", repr(mode)), f"rpi-audiod: [bridge] mode {mode!r} is not zita or native; using zita")
+        mode = "zita"
+    margin = number("margin_ms", 2.0, 0.25, 20.0)
+    return {"mode": mode, "quality": int(number("quality", 32, 8, 96)),
+            IN: round(number("margin_in_ms", margin, 0.25, 20.0) * 1000),
+            OUT: round(number("margin_out_ms", margin, 0.25, 20.0) * 1000)}
+
+
 class Bridge:
-    """One direction of one device: a zita process, restarted with backoff."""
+    """One direction of one device: a zita process, or rpi-audio-hostbridge with [bridge] mode = "native",
+    restarted with backoff."""
 
     def __init__(self, dev, direction):
         self.dev, self.direction = dev, direction
@@ -559,6 +591,7 @@ class Bridge:
         self.child, self.backoff, self.next_try, self.start = None, 1.0, 0.0, None
         self.send_client = "system"
         self.gadget = True                                # False: no host, so no gadget channels to connect
+        self.metrics = {}                                 # last status line of a native bridge
 
     def routes(self):
         if self.start is None or not self.gadget:
@@ -587,15 +620,48 @@ class Bridge:
         if self.child or (self.start is None and self.gadget):
             self.blocked = None
         elif now >= self.next_try and self.check_budget(used, budget):
-            b = cfg["bridge"]
-            tool = "zita-a2j" if self.direction == IN else "zita-j2a"
-            cmd = [tool, "-j", self.client, "-d", f"hw:CARD={self.dev.id}", "-r", str(self.rate),
-                   "-c", str(self.channels), "-p", str(b.get("period", 256)), "-n", str(b.get("periods", 2))]
+            cmd = self.command(cfg["bridge"])
             log(f"rpi-audiod: starting {' '.join(cmd)}")
-            # zita only leaves JACK cleanly on SIGINT; SIGTERM kills it mid-cycle and
-            # jackd logs xruns until it drops the client.
-            self.child = Child(self.client, cmd, stop_signal=signal.SIGINT)
+            self.metrics = {}
+            if cmd[0].endswith("rpi-audio-hostbridge"):
+                self.child = Child(self.client, cmd, on_line=self.status_line)
+            else:
+                # zita only leaves JACK cleanly on SIGINT; SIGTERM kills it mid-cycle and
+                # jackd logs xruns until it drops the client.
+                self.child = Child(self.client, cmd, stop_signal=signal.SIGINT)
             self.holding = True
+
+    def command(self, b):
+        """rpi-audio-hostbridge when [bridge] mode = "native" and it is built, else zita-a2j / zita-j2a."""
+        settings = device_bridge_settings(b)
+        if settings["mode"] == "native":
+            helper = Path(__file__).resolve().parent / HOSTBRIDGE
+            if os.access(helper, os.X_OK):
+                return [str(helper), "--client", self.client, "--device", f"hw:CARD={self.dev.id}",
+                        "--direction", "capture" if self.direction == IN else "playback",
+                        "--rate", str(self.rate), "--channels", str(self.channels),
+                        "--margin-us", str(settings[self.direction]), "--quality", str(settings["quality"])]
+            warn_once("helper", f"rpi-audiod: [bridge] mode is native but {helper} is not built; using zita")
+        tool = "zita-a2j" if self.direction == IN else "zita-j2a"
+        return [tool, "-j", self.client, "-d", f"hw:CARD={self.dev.id}", "-r", str(self.rate),
+                "-c", str(self.channels), "-p", str(b.get("period", 256)), "-n", str(b.get("periods", 2))]
+
+    def status_line(self, line):
+        """A native bridge prints one JSON status line a second: kept, not logged. Anything else is logged."""
+        try:
+            data = json.loads(line)
+        except ValueError:
+            data = None
+        if isinstance(data, dict) and data.get("event") == "status":
+            self.metrics = data
+        elif line.strip():
+            log(f"[{self.client}] {line}")
+
+    def bridge_metrics(self):
+        """{"bridge": the last status of a running native bridge}, or {} (zita says nothing)."""
+        if not (self.child and self.child.alive() and self.metrics.get("event") == "status"):
+            return {}
+        return {"bridge": {k: v for k, v in self.metrics.items() if k != "event"}}
 
     def stop(self, disconnect=True):
         """disconnect=False when jackd is going away too: a stuck server could hang it."""
@@ -1656,7 +1722,7 @@ class Daemon:
                     entry[direction] = {"client": b.client, "rate": b.rate, "channels": b.channels,
                                         "start": b.start, "running": bool(b.child and b.child.alive()),
                                         "muted": i in self.muted[direction],
-                                        "level": self.volumes.get((i, direction))}
+                                        "level": self.volumes.get((i, direction)), **b.bridge_metrics()}
                     extra = {"slots": b.size if b.size != b.channels else None,
                              "ignored": [k for k in range(1, b.channels + 1) if k not in b.kept] or None,
                              "names": presets.channel_names(dev.profile.get("names", direction) if dev.profile else (),
@@ -1689,7 +1755,8 @@ class Daemon:
         data = {"engine": {"rate": self.sink.get('rate', max(self.rates)),
                            "period": engine.get('period', 64), "periods": engine.get('periods', 3)},
                 "bridge_buffer": {"period": self.cfg.get('bridge', {}).get('period', 256),
-                                  "periods": self.cfg.get('bridge', {}).get('periods', 2)},
+                                  "periods": self.cfg.get('bridge', {}).get('periods', 2),
+                                  "mode": device_bridge_settings(self.cfg.get('bridge', {}))["mode"]},
                 "version": VERSION, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "host_playback_rate": playback_rate,
                 "host_capture_rate": capture_rate, "feeder": self.mode, "jack_ready": self.jack_ready,
                 "gadget_channels": self.usb_channels if self.hub else self.channels,
@@ -1791,6 +1858,9 @@ class Daemon:
                     b.tick(self.cfg, now, self.port_used(b), self.fs_budget)
                     if b.blocked and not was_blocked:
                         self.note('bandwidth_blocks', f'{b.client}: {b.blocked}', severity='warning')
+                    if b.metrics:   # a native bridge: count its jumps back to the margin, like the gadget's
+                        self.session.observe(b.client + '/resyncs', b.metrics.get('resyncs'), 'usb_resyncs',
+                                             f'{b.client}: jumped back to its buffer margin')
                 if now >= self.next_routes:
                     self.connect_routes()
                     self.next_routes = now + 1.0
@@ -1818,6 +1888,14 @@ class Daemon:
         log("rpi-audiod: stopped")
 
 
+
+def print_native_bridge(m):
+    """One line for an rpi-audio-hostbridge's last status: its buffer, as of each JACK cycle's start."""
+    if m:
+        print(f"      native bridge {m.get('state')}: buffer {m.get('fill_min')}/{m.get('fill_avg')}/"
+              f"{m.get('fill_max')} frames (min/avg/max, margin {m.get('margin')}), "
+              f"{m.get('ppm')} ppm, {m.get('resyncs')} resyncs, late up to {m.get('late_max_us')} us")
+
 def cmd_status(_):
     try:
         s = json.loads(STATUS.read_text())
@@ -1840,10 +1918,7 @@ def cmd_status(_):
                     b = d[side]
                     print(f"    {side}: {b['channels']} ch, {'running' if b['running'] else 'waiting'}")
                     m = b.get("bridge")
-                    if m:   # rpi-audio-hostbridge: its buffer in gadget frames, as of each JACK cycle's start
-                        print(f"      native bridge {m.get('state')}: buffer {m.get('fill_min')}/{m.get('fill_avg')}/"
-                              f"{m.get('fill_max')} frames (min/avg/max, margin {m.get('margin')}), "
-                              f"{m.get('ppm')} ppm, {m.get('resyncs')} resyncs, late up to {m.get('late_max_us')} us")
+                    print_native_bridge(b.get("bridge"))
             continue
         if d.get("local"):
             b = d[OUT]
@@ -1865,6 +1940,7 @@ def cmd_status(_):
                     extra += f", level {b['level']}%"
                 print(f"    {b['client']:16} {b['channels']} ch {b['rate']} Hz  {label} {where}".rstrip()
                       + f"  {'running' if b['running'] else 'not running'}{extra}")
+                print_native_bridge(b.get("bridge"))
                 if b.get("blocked"):
                     print(f"      waiting: {b['blocked']}")
     if s.get("presets"):

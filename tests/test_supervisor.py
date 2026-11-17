@@ -575,6 +575,64 @@ def test_bridge_command_and_cfg(monkeypatch, tmp_path):
     assert b.child.cmd[-4:] == ["-p", "256", "-n", "2"]
 
 
+def test_native_device_bridge_command_with_margins_per_direction(monkeypatch, tmp_path):
+    w, d = make(monkeypatch, tmp_path)
+    monkeypatch.setattr(daemon.os, "access", lambda path, mode: True)   # rpi-audio-hostbridge is built
+    cfg = {"bridge": {"mode": "native", "margin_ms": 1.5, "margin_out_ms": 3, "quality": 48}}
+    cap, play = bridge_for(w, IN), bridge_for(w, OUT)
+    cap.tick(cfg, w.now)
+    play.tick(cfg, w.now)
+    assert cap.child.cmd[0].endswith("audio/rpi-audio-hostbridge") and cap.child.cmd[1:] == [
+        "--client", "mixer_in", "--device", "hw:CARD=mixer", "--direction", "capture", "--rate", "48000",
+        "--channels", "2", "--margin-us", "1500", "--quality", "48"]
+    assert play.child.cmd[play.child.cmd.index("--direction") + 1] == "playback"
+    assert play.child.cmd[play.child.cmd.index("--margin-us") + 1] == "3000"
+    assert cap.child.stop_signal == signal.SIGTERM and cap.child.on_line == cap.status_line
+
+
+def test_native_device_bridge_bad_values_use_their_defaults(monkeypatch, tmp_path):
+    w, d = make(monkeypatch, tmp_path)
+    monkeypatch.setattr(daemon, "_warned", set())
+    monkeypatch.setattr(daemon.os, "access", lambda path, mode: True)
+    b = bridge_for(w, IN)
+    b.tick({"bridge": {"mode": "native", "margin_ms": 0.1, "quality": "high"}}, w.now)
+    cmd = b.child.cmd
+    assert cmd[cmd.index("--margin-us") + 1] == "2000" and cmd[cmd.index("--quality") + 1] == "32"
+    assert logged(w, "margin_ms 0.1 is not a number") and logged(w, "quality 'high' is not a number")
+    b = bridge_for(w, OUT)
+    b.tick({"bridge": {"mode": "fast"}}, w.now)
+    assert b.child.cmd[0] == "zita-j2a" and logged(w, "mode 'fast' is not zita or native")
+
+
+def test_native_device_bridge_falls_back_to_zita_when_not_built(monkeypatch, tmp_path):
+    w, d = make(monkeypatch, tmp_path)
+    monkeypatch.setattr(daemon, "_warned", set())
+    monkeypatch.setattr(daemon.os, "access", lambda path, mode: False)
+    for direction in (IN, OUT):
+        b = bridge_for(w, direction)
+        b.tick({"bridge": {"mode": "native"}}, w.now)
+        assert b.child.cmd[0].startswith("zita-") and b.child.stop_signal == signal.SIGINT
+    assert len(logged(w, "is not built; using zita")) == 1
+
+
+def test_native_device_bridge_status_is_kept_shown_and_counted(monkeypatch, tmp_path):
+    monkeypatch.setattr(daemon.os, "access", lambda path, mode: True)
+    w, d = bring_up(monkeypatch, tmp_path, usb_device(1, "mixer"), bridge={"mode": "native"})
+    b = d.bridges[("usb-mixer", IN)]
+    assert b.child.cmd[0].endswith("rpi-audio-hostbridge") and b.bridge_metrics() == {}
+    b.status_line('{"event": "status", "state": "running", "resyncs": 2, "fill_min": 90, "margin": 96}')
+    b.status_line("rpi-audio-hostbridge: hw:CARD=mixer opened")
+    assert logged(w, "[mixer_in] rpi-audio-hostbridge: hw:CARD=mixer opened")
+    assert b.bridge_metrics() == {"bridge": {"state": "running", "resyncs": 2, "fill_min": 90, "margin": 96}}
+    entry = {e["identity"]: e for e in d.status_data()["devices"]}["usb-mixer"]
+    assert entry[IN]["bridge"]["fill_min"] == 90 and "bridge" not in entry[OUT]
+    w.run_loop(1)
+    counters = d.status_data()["session"]["counters"]
+    assert counters.get("usb_resyncs") == 2
+    b.child.die()
+    assert b.bridge_metrics() == {}
+
+
 def test_bridge_restarts_with_doubling_backoff(monkeypatch, tmp_path):
     w, d = make(monkeypatch, tmp_path)
     cfg, b = {"bridge": {}}, bridge_for(w)
