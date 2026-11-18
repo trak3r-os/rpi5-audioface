@@ -204,7 +204,11 @@ Measured on 2026-11-17 with `jack_iodelay` on the Pi. The signal went from JACK 
 | MPC's buffer, 128 at 44.1 kHz each way | about 5.8 ms (estimate) |
 | The rest: the Force's ALSA buffering and the gadget's USB request queues | about 3.7 ms (estimate) |
 
-- **Not included:** conversion on the pHAT or on a USB device, the device bridges (below), and any latency compensation MPC applies when recording. From the pHAT's analog input to its output through MPC's monitoring would come to about 17 ms by estimate; that has not been measured.
+- **Not included:** conversion on the pHAT or on a USB device, the device bridges (below), and any latency compensation MPC applies when recording. For the full analog path, see the next bullet.
+- **Analog in, through MPC's monitoring, and back out:** 22.65 ms. Measured on 2026-11-18 with the same trial setup as a closed loop: pHAT line out → external mixer → the mixer's USB CODEC (native bridge, 1.0 ms) → MPC input 1–2 → an audio track with monitoring on → gadget channels 25–26 → JACK. That gave 1087.2 frames (n=57, ±0.6 frames).
+  - A closed loop has the same total wherever you cut it. So this is what a player hears going from an instrument plugged into the mixer to the pHAT output through MPC.
+  - The figure depends on where the CODEC bridge locks after a resync, which can be one JACK period apart. At the lower phase it would come to about 21.3 ms (estimate).
+  - The USB and MPC part works out to about 12.7 ms, close to the 12.4 ms above.
 - **Where the time goes:** MPC's own buffer is the largest part. At 64 it would save about 2.9 ms, if the Force copes with it (not tried).
 - **Margins per direction** (`host_margin_send_ms`, `host_margin_return_ms`): send 1.0 ms with return 0.5 ms ran 37 minutes with 0 resyncs and 0 xruns once the start-up transients had passed. With 0.75 ms on both sides, the send direction resynced under load from other processes. The repo default is still 1.5 ms each way; the 1.0 / 0.5 pair only ran as a temporary overlay on the Pi.
 
@@ -230,7 +234,8 @@ Each USB audio device gets one bridge per direction. Since 2026-11-17 these are 
   | The same, after a capture bridge resync | **9.93 ms** (476 frames) |
 
   The figure includes both converters, the mixer, JACK's own buffering and the capture bridge. After the bridge resynced, the round trip moved by one JACK period (64 frames) and stayed there; why it lands on one phase or the other is not known yet.
-- **Not checked yet:** how they sound (clicks, resampling quality), and the full latency from a device's input to the Force.
+- **Through the Force:** analog in through the CODEC bridge → MPC monitoring → back out measured 22.65 ms (see the Force latency section above).
+- **Not checked yet:** how they sound (clicks, resampling quality).
 
 ### CPU and integrity
 
