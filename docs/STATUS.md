@@ -24,7 +24,9 @@
 - [Pi, usuario] **pHAT → mezclador → `codec_in` sin medir:** el tono no llega al mezclador y con auriculares en el pHAT no se oye nada; parece mal asentado o en mute (XSMT). En la Pi 5 nunca se ha oído. Una lectura de 584 tramas era ruido de masa (peine de 750 Hz = 48000/64), no el tono. [Sesión](hw/2026-11-17-latency.md#phat--mezclador--codec_in-15201545-sin-medida). Repetido el 2026-11-18 tras reasentarlo: sigue sin llegar el tono, solo el peine de 750 Hz, que sube 11 dB con el cliente tocando. Era el cableado: recolocado, la ida y vuelta pHAT → mezclador → `codec_in` mide 412,5 tramas = 8,59 ms o 476 tramas = 9,93 ms (`jack_iodelay`, jackd `-p 64 -n 3`, puente `codec_in` a 1000 µs, nivel limpio a −21 dB). El salto de un periodo de JACK sigue a una resincronización del puente `codec_in`. [Sesión](hw/2026-11-18-rtl.md).
 - [código] **Puentes de dispositivo nativos por defecto** (decisión del usuario, tras el soak y sin escucharlos todavía): `[bridge] mode` vale `"native"` con entrada 1,0 ms y salida 2,0 ms; `margin_ms` fija los dos; `mode = "zita"` vuelve a zita, y zita se sigue usando si `rpi-audio-hostbridge` no está compilado. README, MANUAL y OUTPUTS al día.
 - **Siguiente:**
-  - Reasentar el pHAT, comprobar que suena con auriculares y repetir `jack_iodelay` `system:playback_1` → `codec_in:capture_1`. Vigilar si vuelven los `Bad descriptor` del DMA.
+  - Vigilar si vuelven los `Bad descriptor` del DMA del pHAT. (La ida y vuelta pHAT → `codec_in` ya está medida, 2026-11-18, y anotada en el README.)
+  - Ida y vuelta con la Force y los puentes nativos de dispositivo: entrada analógica (mezclador o pHAT) → MPC en monitor → salida.
+  - Probar el buffer de MPC a 64 (ahorraría ~2,9 ms) [est].
   - Hacer durable la configuración (envío 1,0 / retorno 0,5 / jackd 64): pasar a `10-local-tuning.toml` y desplegar sin `--volatile`. Hace falta quitar el overlay y reiniciar dos veces, nunca con la Force en marcha.
   - Aclarar la ráfaga del arranque: muestrear sin abrir una sesión SSH por muestra.
   - Escuchar los puentes de dispositivo nativos (ya son el modo por defecto): clics o cortes en el Tracker, el mezclador y la GP-150.

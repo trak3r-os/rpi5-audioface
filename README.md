@@ -190,7 +190,7 @@ The Pi's share of the round trip (audio in from the host, through the Pi, and ba
 - The native bridge at the default margin takes **5–6 ms off** zita's round trip, and sits about 1.5–3 ms above host-clock mode. The two methods in the session agree: 6.5 ms against 11.7 ms for zita by the first, 8.6 against 14.8 by the second.
 - The bridge reports its delay to JACK: 107 frames on the capture side and 104 on the playback side, so JACK's latency queries include it.
 - **Margin.** Below 1.5 ms the laptop saw 1–4 resyncs per 12-second open, for a reason that is not known. With the Akai Force as the host the 0.75 ms margin ran 10.5 minutes with 0 resyncs, which points at the laptop rather than the bridge, but that is a single run. 1.5 ms stays the default.
-- **JACK on the pHAT DAC at 64×3** (1.3 ms) ran 3 minutes with 0 xruns and the fan on. Without the fan it gave 8 xruns in 2 minutes. It is a short test, so the Pi stays at 128×3 until a longer run.
+- **JACK on the pHAT DAC at 64×3** (1.3 ms) ran 3 minutes with 0 xruns and the fan on. Without the fan it gave 8 xruns in 2 minutes. Later, with the Force as the host, two 42-minute runs at 64×3 had 0 xruns for their last 37–40 minutes; the xruns came in the first 2–5 minutes after restarting `rpi-audiod`. The repo default is still 128×3; 64×3 has only run as a temporary overlay on the Pi.
 - With the Akai Force as the host, see the next section.
 
 ### Latency (Akai Force as the host)
@@ -222,6 +222,14 @@ Each USB audio device gets one bridge per direction. Since 2026-11-17 these are 
 - The native bridges take **1.7–2.1 ms off each input** and about 1.2 ms off the Tracker's output, compared with zita at 64×2. zita at its default 256×2 adds more.
 - **Stability:** in a 60-minute soak with the Force connected, the four device bridges ran the last 47 minutes with 0 resyncs and 0 xruns. The earlier failures came from test clients and from a 2-second pHAT dropout. Each bridge process uses about 2 % of a core.
 - **Playback needs 2.0 ms.** At 1.5 ms the Tracker's output resynced about every 1–2 minutes (23 times in 10 minutes).
+- **Analog round trip through a device bridge.** Measured on 2026-11-18 with `jack_iodelay` on the Pi, with no USB host attached: JACK out on the pHAT DAC (line out), into an external analog mixer, and back in through the mixer's USB CODEC (PCM2902, 48 kHz) and its native capture bridge (1.0 ms margin). jackd ran at 64×3 on the pHAT.
+
+  | | Round trip |
+  |---|---|
+  | pHAT out → mixer → USB CODEC in | **8.59 ms** (412.5 frames at 48 kHz) |
+  | The same, after a capture bridge resync | **9.93 ms** (476 frames) |
+
+  The figure includes both converters, the mixer, JACK's own buffering and the capture bridge. After the bridge resynced, the round trip moved by one JACK period (64 frames) and stayed there; why it lands on one phase or the other is not known yet.
 - **Not checked yet:** how they sound (clicks, resampling quality), and the full latency from a device's input to the Force.
 
 ### CPU and integrity
