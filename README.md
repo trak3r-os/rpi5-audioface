@@ -190,7 +190,7 @@ The Pi's share of the round trip (audio in from the host, through the Pi, and ba
 - The native bridge at the default margin takes **5–6 ms off** zita's round trip, and sits about 1.5–3 ms above host-clock mode. The two methods in the session agree: 6.5 ms against 11.7 ms for zita by the first, 8.6 against 14.8 by the second.
 - The bridge reports its delay to JACK: 107 frames on the capture side and 104 on the playback side, so JACK's latency queries include it.
 - **Margin.** Below 1.5 ms the laptop saw 1–4 resyncs per 12-second open, for a reason that is not known. With the Akai Force as the host the 0.75 ms margin ran 10.5 minutes with 0 resyncs, which points at the laptop rather than the bridge, but that is a single run. 1.5 ms stays the default.
-- **JACK on the pHAT DAC at 64×3** (1.3 ms) ran 3 minutes with 0 xruns and the fan on. Without the fan it gave 8 xruns in 2 minutes. Later, with the Force as the host, two 42-minute runs at 64×3 had 0 xruns for their last 37–40 minutes; the xruns came in the first 2–5 minutes after restarting `rpi-audiod`. The repo default is still 128×3; 64×3 has only run as a temporary overlay on the Pi.
+- **JACK on the pHAT DAC at 64×3** (1.3 ms) ran 3 minutes with 0 xruns and the fan on. Without the fan it gave 8 xruns in 2 minutes. Later, with the Force as the host, two 42-minute runs at 64×3 had 0 xruns for their last 37–40 minutes; the xruns came in the first 2–5 minutes after restarting `rpi-audiod`. The repo default is still 128×3. The test Pi has kept 64×3 in its local tuning file (`rpi-audio.d/10-local-tuning.toml`) since 2026-11-18; it has not been soaked again since that reboot.
 - With the Akai Force as the host, see the next section.
 
 ### Latency (Akai Force as the host)
@@ -210,7 +210,7 @@ Measured on 2026-11-17 with `jack_iodelay` on the Pi. The signal went from JACK 
   - The figure depends on where the CODEC bridge locks after a resync, which can be one JACK period apart. At the lower phase it would come to about 21.3 ms (estimate).
   - The USB and MPC part works out to about 12.7 ms, close to the 12.4 ms above.
 - **Where the time goes:** MPC's own buffer is the largest part. At 64 it would save about 2.9 ms, if the Force copes with it (not tried).
-- **Margins per direction** (`host_margin_send_ms`, `host_margin_return_ms`): send 1.0 ms with return 0.5 ms ran 37 minutes with 0 resyncs and 0 xruns once the start-up transients had passed. With 0.75 ms on both sides, the send direction resynced under load from other processes. The repo default is still 1.5 ms each way; the 1.0 / 0.5 pair only ran as a temporary overlay on the Pi.
+- **Margins per direction** (`host_margin_send_ms`, `host_margin_return_ms`): send 1.0 ms with return 0.5 ms ran 37 minutes with 0 resyncs and 0 xruns once the start-up transients had passed. With 0.75 ms on both sides, the send direction resynced under load from other processes. The repo default is still 1.5 ms each way. The test Pi has kept the 1.0 / 0.5 pair in its local tuning file since 2026-11-18; it has not been soaked again since that reboot.
 
 ### USB device bridges (native or zita)
 

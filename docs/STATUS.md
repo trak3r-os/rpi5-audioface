@@ -27,7 +27,7 @@
   - Vigilar si vuelven los `Bad descriptor` del DMA del pHAT. (La ida y vuelta pHAT → `codec_in` ya está medida, 2026-11-18, y anotada en el README.)
   - ~~Ida y vuelta con la Force y los puentes nativos de dispositivo.~~ Hecho el 2026-11-18 [Pi, Force]: pHAT → mezclador → `codec_in` → MPC (monitor In, buffer 128, 44,1 kHz) → Pi: **1087,2 tramas = 22,65 ms**; la parte USB + MPC es ~12,7 ms [est]. [Sesión](hw/2026-11-18-rtl.md#ida-y-vuelta-analógica-con-la-force-22482253).
   - Probar el buffer de MPC a 64 (ahorraría ~2,9 ms) [est]. En 3.9.1 solo con el add-on `customBufferSize` de MockbaMod: activarlo en la SD (`manage.sh ENABLE`, ahora configurado a 96 e inactivo) y reiniciar MPC. Queda pendiente de que el usuario lo autorice.
-  - Hacer durable la configuración (envío 1,0 / retorno 0,5 / jackd 64): pasar a `10-local-tuning.toml` y desplegar sin `--volatile`. Hace falta quitar el overlay y reiniciar dos veces, nunca con la Force en marcha.
+  - ~~Hacer durable la configuración (envío 1,0 / retorno 0,5 / jackd 64).~~ Hecho el 2026-11-18 [Pi]: en `10-local-tuning.toml`, desplegado `3c48e46` con `--read-only` y comprobado tras reiniciar (jackd `-p 64 -n 3`, márgenes en la configuración efectiva). Falta verlo con la Force conectada: puentes del gadget a 1000/500 µs y un soak. [Sesión](hw/2026-11-18-rtl.md#configuración-durable-23002308).
   - Aclarar la ráfaga del arranque: muestrear sin abrir una sesión SSH por muestra.
   - Escuchar los puentes de dispositivo nativos (ya son el modo por defecto): clics o cortes en el Tracker, el mezclador y la GP-150.
 
