@@ -165,7 +165,7 @@ What has been tested:
 | Host | Result |
 |---|---|
 | Linux laptop | 26×26 at 16-bit: bit-exact tones in both directions; 10-minute duplex soak with no xruns; USB MIDI, SysEx and CC control |
-| Akai Force | MPC opens it at 26×26, 16-bit. 60-minute duplex soak with 0 xruns and 0 underflows, and MIDI control from an MPC track (Pi 4, zita bridge). On a Pi 5 with the native bridge and a fan: 62-minute soak with a Tracker and a mixer attached, 0 xruns and 0 resyncs, and MPC kept its stream open. Latency with the Force as the host has not been measured, and nobody has listened for clicks yet |
+| Akai Force | MPC opens it at 26×26, 16-bit. 60-minute duplex soak with 0 xruns and 0 underflows, and MIDI control from an MPC track (Pi 4, zita bridge). On a Pi 5 with the native bridge and a fan: 62-minute soak with a Tracker and a mixer attached, 0 xruns and 0 resyncs, and MPC kept its stream open. Round trip through MPC: 12.4 ms (see [Performance](#latency-akai-force-as-the-host)). Nobody has listened for clicks yet |
 | macOS | Not tested |
 | Windows | Not tested. Windows' class driver (`usbaudio2.sys`) is documented to limit shared mode to 8 channels, so expect to need exclusive mode or ASIO, or a lower channel count |
 
@@ -191,7 +191,38 @@ The Pi's share of the round trip (audio in from the host, through the Pi, and ba
 - The bridge reports its delay to JACK: 107 frames on the capture side and 104 on the playback side, so JACK's latency queries include it.
 - **Margin.** Below 1.5 ms the laptop saw 1–4 resyncs per 12-second open, for a reason that is not known. With the Akai Force as the host the 0.75 ms margin ran 10.5 minutes with 0 resyncs, which points at the laptop rather than the bridge, but that is a single run. 1.5 ms stays the default.
 - **JACK on the pHAT DAC at 64×3** (1.3 ms) ran 3 minutes with 0 xruns and the fan on. Without the fan it gave 8 xruns in 2 minutes. It is a short test, so the Pi stays at 128×3 until a longer run.
-- **Not measured:** the round trip with the Force as the host. The Force path has only been checked for stability.
+- With the Akai Force as the host, see the next section.
+
+### Latency (Akai Force as the host)
+
+Measured on 2026-11-17 with `jack_iodelay` on the Pi. The signal went from JACK out to the Force over USB, through an MPC audio track with monitoring on (gadget channels 25–26), and back into JACK. MPC ran at 44.1 kHz with a 128-sample buffer. This was a trial setup, not the shipped defaults: jackd at 64×3, and gadget bridge margins of 1.0 ms on send and 0.5 ms on return.
+
+| | Round trip |
+|---|---|
+| **Total, Pi → MPC → Pi** | **12.4 ms** (596.6 frames at 48 kHz, ±1 frame over 126 readings) |
+| Pi bridges, as reported to JACK | 2.9 ms (80 frames playback + 59 capture) |
+| MPC's buffer, 128 at 44.1 kHz each way | about 5.8 ms (estimate) |
+| The rest: the Force's ALSA buffering and the gadget's USB request queues | about 3.7 ms (estimate) |
+
+- **Not included:** conversion on the pHAT or on a USB device, the device bridges (below), and any latency compensation MPC applies when recording. From the pHAT's analog input to its output through MPC's monitoring would come to about 17 ms by estimate; that has not been measured.
+- **Where the time goes:** MPC's own buffer is the largest part. At 64 it would save about 2.9 ms, if the Force copes with it (not tried).
+- **Margins per direction** (`host_margin_send_ms`, `host_margin_return_ms`): send 1.0 ms with return 0.5 ms ran 37 minutes with 0 resyncs and 0 xruns once the start-up transients had passed. With 0.75 ms on both sides, the send direction resynced under load from other processes. The repo default is still 1.5 ms each way; the 1.0 / 0.5 pair only ran as a temporary overlay on the Pi.
+
+### USB device bridges (native or zita)
+
+Each USB audio device gets one bridge per direction. Since 2026-11-17 these are native (`rpi-audio-hostbridge`) by default, with a 1.0 ms margin on capture and 2.0 ms on playback, and ALSA periods of about 1 ms. The delay each one reports to JACK, at 48 kHz:
+
+| Port | zita 64×2 | Native, in 1.0 / out 2.0 ms (default) |
+|---|---|---|
+| Tracker capture (S16, 44.1 kHz) | 185 frames (3.9 ms) | 83 frames (1.7 ms) |
+| Mixer capture (S16, 48 kHz) | 160 frames (3.3 ms) | 80 frames (1.7 ms) |
+| GP-150 capture (S32, 48 kHz) | 160 frames (3.3 ms) | 80 frames (1.7 ms) |
+| Tracker playback (S16, 44.1 kHz) | 185 frames (3.9 ms) | 128 frames (2.7 ms) |
+
+- The native bridges take **1.7–2.1 ms off each input** and about 1.2 ms off the Tracker's output, compared with zita at 64×2. zita at its default 256×2 adds more.
+- **Stability:** in a 60-minute soak with the Force connected, the four device bridges ran the last 47 minutes with 0 resyncs and 0 xruns. The earlier failures came from test clients and from a 2-second pHAT dropout. Each bridge process uses about 2 % of a core.
+- **Playback needs 2.0 ms.** At 1.5 ms the Tracker's output resynced about every 1–2 minutes (23 times in 10 minutes).
+- **Not checked yet:** how they sound (clicks, resampling quality), and the full latency from a device's input to the Force.
 
 ### CPU and integrity
 
