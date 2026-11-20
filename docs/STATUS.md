@@ -20,8 +20,6 @@
 
 ## Actualización del 18 de noviembre: con la Force y el Tracker
 
-## Actualización del 18 de noviembre: con la Force y el Tracker
-
 - [Pi] Tras el reinicio con la configuración durable, los puentes del gadget arrancan con `--margin-us 1000` (envío) y `500` (retorno); jackd `-p 64 -n 3`.
 - [Pi, Force] **Tracker → Force:** `track3r_in` 7/8 → `usb_host_out` 13/14 (Input 13,14 en MPC). Pico −6,8 dBFS en JACK y −6,62 dB en el medidor de MPC, sin clips.
 - [Pi, Force] **Ida y vuelta con la música del Tracker:** **593,7 tramas = 12,37 ms** (correlación, rho 0,998, sin deriva, ganancia unidad). Confirma los 12,4 ms de `jack_iodelay` del 17.
