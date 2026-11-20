@@ -16,6 +16,7 @@
 
   El usuario escribió «4-5 mezclador, 5-6 GP150»; se interpretó como 5–6 y 7–8. Siguen OUT 1–2 → pHAT y OUT 11–12 → Tracker.
 - [Force] `mpc_internal_io.conf` de la SD de MockbaMod: `capture = 5:1, 6:2` → `1:1, 2:2` (copia `.bak-20261120` al lado). **No se aplica hasta reiniciar MPC.**
+- [Pi] Guardado como **escena 3 «Force + Tracker»** (`preset save 3`; comprobadas las 8 rutas en el preset). Se recarga desde la pantalla (Scenes → 3 → Load), `rpi-audiod preset load 3` o Program Change 2 en el canal 16. La escena solo guarda lo de la Pi: no el modo USB ni el mapa de stems del Tracker, ni el `mpc_internal_io.conf` de la Force.
 - **Sin oír ni medir con señal:** los 8 canales del Tracker dan −90 dBFS en JACK (el Tracker parecía parado). Falta ver el Tracker en los medidores de MPC (IN 3–4) y las entradas analógicas en IN 1–2 tras reiniciar MPC.
 
 ## Actualización del 18 de noviembre: con la Force y el Tracker
