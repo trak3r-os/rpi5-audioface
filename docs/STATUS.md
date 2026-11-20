@@ -1,4 +1,24 @@
-# Estado: 2026-11-18
+# Estado: 2026-11-20
+
+## Actualización del 20 de noviembre: el Tracker no se oía en la Force, y entradas nuevas
+
+- [Pi] **Causa:** el Tracker arrancó en modo **STANDARD** (USB AUDIO Off: solo CDC + MIDI, `bcdDevice` 0.01, sin `stream0`), así que `rpi-audiod` no veía su audio. Con `usb mode audio` por la consola CDC (solo en ejecución, no toca la preferencia) volvió a enumerar en AUDIO (`bcdDevice` 1.01, perfil 8, 8 OUT / 2 IN) y los dos puentes nativos arrancaron. **Tras reiniciar el Tracker volverá a STANDARD** mientras su preferencia USB AUDIO siga en Off (Config → USB → On → F7 dos veces).
+- [Pi] **Mapa de stems del Tracker** (en ejecución; tras reiniciar vuelve al de fábrica T1–T6 + Master en 7–8): S1–S2 = Master L/R, S3–S8 = T1–T6. Antes era S1–S6 vacíos y el Master en 7–8.
+- [Pi] **Entradas de la Force, a petición del usuario** (`rpi-audiod route/unroute`, `routes` sin `waiting` y conexiones JACK comprobadas):
+
+  | IN en MPC | Origen |
+  |---|---|
+  | 1–2 | entradas analógicas de la Force (`mpc_internal_io`) |
+  | 3–4 | Tracker 1–2 (Master) |
+  | 5–6 | mezclador (CODEC) |
+  | 7–8 | GP-150 |
+  | 9–14 | Tracker 3–8 (T1–T6) |
+
+  El usuario escribió «4-5 mezclador, 5-6 GP150»; se interpretó como 5–6 y 7–8. Siguen OUT 1–2 → pHAT y OUT 11–12 → Tracker.
+- [Force] `mpc_internal_io.conf` de la SD de MockbaMod: `capture = 5:1, 6:2` → `1:1, 2:2` (copia `.bak-20261120` al lado). **No se aplica hasta reiniciar MPC.**
+- **Sin oír ni medir con señal:** los 8 canales del Tracker dan −90 dBFS en JACK (el Tracker parecía parado). Falta ver el Tracker en los medidores de MPC (IN 3–4) y las entradas analógicas en IN 1–2 tras reiniciar MPC.
+
+## Actualización del 18 de noviembre: con la Force y el Tracker
 
 ## Actualización del 18 de noviembre: con la Force y el Tracker
 
